@@ -5,6 +5,8 @@ A simple Python-based Mood Predictor that analyzes user input and predicts emoti
 ---
 Project presentation files can be viewed below:
 
+[View Presentation (PDF)](Mood_Predictor_Presentation.pdf)
+
 
 
 
