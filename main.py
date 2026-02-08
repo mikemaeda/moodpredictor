@@ -1,15 +1,3 @@
-"""
-Mike's CS 156 Final Project
-Title: Simple Mood Predictor
-
-Concepts used in class 
-- input(), print()
-- if/elif/else
-- functions
-- loops
-- dictionaries
-- file generation input/output
-"""
 
 import os
 from datetime import datetime
@@ -275,3 +263,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
