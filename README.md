@@ -3,6 +3,10 @@
 A simple Python-based Mood Predictor that analyzes user input and predicts emotional state based on self-reported scores. This project was developed to practice core Python programming concepts while building a small, practical application that demonstrates data input, decision-making logic, and file handling.
 
 ---
+Project presentation files can be viewed below:
+
+
+- 📄 [Presentation Document](Design..pdf)
 
 ## Overview
 
