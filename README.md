@@ -1,17 +1,19 @@
 # Mood Predictor
 
-A polished Python command-line app for recording daily mood check-ins, predicting a mood category from self-reported scores, and saving a local mood history for later review.
+A polished Python command-line app for daily mood check-ins, local mood history, and lightweight personal trend analysis.
 
-The app uses a transparent rule-based model instead of a black-box prediction system. Users rate five factors from 1 to 10, and the program uses those answers to classify the day as `Happy`, `Calm`, `Neutral`, `Sad`, `Angry`, or `Stressed`.
+Mood Predictor uses a transparent rule-based model: users rate five factors from 1 to 10, then the app predicts a mood category and calculates a 0-100 mood score. It keeps the logic easy to understand while still giving users useful history, summaries, and trend feedback.
 
-## Features
+## Highlights
 
 - Create and load local user profiles
 - Record daily ratings for energy, positivity, stress, connection, and control
-- Predict a mood using clear rule-based logic
+- Predict a mood: `Happy`, `Calm`, `Neutral`, `Sad`, `Angry`, or `Stressed`
+- Calculate a 0-100 mood score with a clear wellness level
 - Save mood history to CSV
 - View recent entries from the terminal
-- Generate a simple mood summary with counts and averages
+- Review mood counts, average ratings, and focus areas
+- Display an ASCII trend chart for recent mood scores
 - Open the saved history file from the app
 - Includes automated tests and GitHub Actions CI
 
@@ -21,14 +23,14 @@ The app uses a transparent rule-based model instead of a black-box prediction sy
 .
 ├── main.py                              # Mood Predictor CLI app
 ├── tests/
-│   └── test_main.py                     # Unit tests for core behavior
+│   └── test_main.py                     # Unit tests for scoring, prediction, and storage
 ├── docs/
 │   ├── mood-predictor-presentation.pdf
 │   └── mood-predictor-presentation.pptx
 └── .github/workflows/ci.yml             # Syntax and test checks
 ```
 
-## How It Works
+## How Scoring Works
 
 The app asks for five ratings:
 
@@ -40,12 +42,20 @@ The app asks for five ratings:
 | Connection | How connected the user feels to others |
 | Control | How much control the user feels over the day |
 
-Those scores are passed into a rule-based mood classifier. For example:
+The mood score combines the four positive factors with an inverse stress score. Higher stress lowers the final score, while stronger energy, positivity, connection, and control raise it.
 
-- High positivity, low stress, and enough energy -> `Happy`
-- Low stress and high control -> `Calm`
-- High stress and low control -> `Stressed`
-- Low positivity and low energy -> `Sad`
+```text
+Mood score = energy + positivity + connection + control + inverse stress
+```
+
+Scores are translated into simple wellness levels:
+
+| Score | Level |
+| --- | --- |
+| 80-100 | Strong |
+| 60-79 | Stable |
+| 40-59 | Mixed |
+| 0-39 | Low |
 
 ## Run Locally
 
@@ -65,6 +75,15 @@ To choose a different storage location, set the `MOOD_PREDICTOR_DIR` environment
 
 ```bash
 python -m unittest discover -s tests
+```
+
+## Example Output
+
+```text
+Mood: Happy
+Score: [###############...]  82/100 (Strong)
+Positive mood, manageable stress, and enough energy are lining up well.
+Advice: Use the momentum for something that matters to you.
 ```
 
 ## Notes
