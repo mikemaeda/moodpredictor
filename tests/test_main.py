@@ -13,6 +13,17 @@ class MoodPredictorTests(unittest.TestCase):
         self.assertEqual(main.slugify(" Mike!!! 2026 "), "mike_2026")
         self.assertEqual(main.slugify("   "), "user")
 
+    def test_calculates_mood_score(self):
+        answers = {
+            "energy": 8,
+            "positivity": 9,
+            "stress": 2,
+            "connection": 8,
+            "control": 7,
+        }
+        self.assertEqual(main.calculate_mood_score(answers), 82)
+        self.assertEqual(main.wellness_level(82), "Strong")
+
     def test_predicts_happy_mood(self):
         result = main.predict_mood(
             {
@@ -24,6 +35,8 @@ class MoodPredictorTests(unittest.TestCase):
             }
         )
         self.assertEqual(result.mood, "Happy")
+        self.assertEqual(result.score, 82)
+        self.assertEqual(result.level, "Strong")
 
     def test_predicts_stressed_mood(self):
         result = main.predict_mood(
@@ -36,6 +49,18 @@ class MoodPredictorTests(unittest.TestCase):
             }
         )
         self.assertEqual(result.mood, "Stressed")
+        self.assertEqual(result.level, "Mixed")
+
+    def test_trend_label_detects_improvement(self):
+        rows = [
+            {"mood_score": "40"},
+            {"mood_score": "42"},
+            {"mood_score": "45"},
+            {"mood_score": "60"},
+            {"mood_score": "62"},
+            {"mood_score": "65"},
+        ]
+        self.assertIn("Improving", main.trend_label(rows))
 
     def test_save_and_read_history(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -48,12 +73,14 @@ class MoodPredictorTests(unittest.TestCase):
                     "connection": 7,
                     "control": 8,
                 }
-                saved_path = main.save_entry(profile, answers, main.MoodResult("Happy", "ok"), "good day")
+                result = main.predict_mood(answers)
+                saved_path = main.save_entry(profile, answers, result, "good day")
                 rows = main.read_history(profile)
 
                 self.assertEqual(saved_path, Path(temp_dir) / "test_user_mood_history.csv")
                 self.assertEqual(len(rows), 1)
                 self.assertEqual(rows[0]["mood"], "Happy")
+                self.assertEqual(rows[0]["mood_score"], "76")
                 self.assertEqual(rows[0]["note"], "good day")
 
 
