@@ -1,266 +1,347 @@
+from __future__ import annotations
 
+import csv
+import json
 import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
-# used to show the Path to the user's Downloads folder
-DOWNLOADS = os.path.join(os.path.expanduser("~"), "Downloads")
-
-
-# -CLEAR SCREEN(DISABLED)--
-
-def clear_screen():
-    """Disabled to avoid flicker in IDLE/VS Code."""
-    pass
-    #taken from the internet. 
-
-# Functions and if/ statements. 
-
-def user_file_name(name):
-    """
-    Return the full file path for a user's mood file,
-    stored inside the Downloads folder.
-
-    Example:
-      name = "mike"
-      -> C:/Users/YourName/Downloads/mike_mood.txt
-    """
-    safe_name = name.strip().replace(" ", "_")
-    filename = f"{safe_name}_mood.txt"
-    return os.path.join(DOWNLOADS, filename)
+APP_NAME = "Mood Predictor"
+DATA_DIR_ENV = "MOOD_PREDICTOR_DIR"
+DEFAULT_DATA_DIR = Path.home() / "Documents" / "MoodPredictor"
+QUESTIONS = [
+    ("energy", "How much energy do you have?"),
+    ("positivity", "How positive do you feel?"),
+    ("stress", "How stressed do you feel?"),
+    ("connection", "How connected do you feel to people around you?"),
+    ("control", "How much control do you feel you have today?"),
+]
+FIELDNAMES = ["timestamp", "energy", "positivity", "stress", "connection", "control", "mood", "note"]
 
 
-def create_new_user():
-    """Create a new user and write base info into their file."""
-    clear_screen()
-    print(" Create New User Profile ")
-
-    name = input("Enter your name: ").strip()
-    age = input("Enter your age: ").strip()
-    reason = input("Why do you want to track your mood? (optional): ").strip()
-
-    filename = user_file_name(name)
-
-    # Make sure Downloads exists (it should, but just in case)
-    os.makedirs(DOWNLOADS, exist_ok=True)
-
-    with open(filename, "w") as f:
-        f.write(f"User: {name}\n")
-        f.write(f"Age: {age}\n")
-        f.write(f"Reason: {reason}\n")
-        f.write("----- Mood History -----\n")
-
-    print(f"\nProfile created. Your file is: {filename}")
-    input("Press Enter to continue...")
-    return name
+@dataclass(frozen=True)
+class Profile:
+    name: str
+    slug: str
+    age: str = ""
+    reason: str = ""
 
 
-def load_existing_user():
-    """Load a user only if their file already exists."""
-    clear_screen()
-    print(" Load Existing User Profile ")
+@dataclass(frozen=True)
+class MoodResult:
+    mood: str
+    message: str
 
-    name = input("Enter your name exactly as before: ").strip()
-    filename = user_file_name(name)
 
-    if os.path.exists(filename):
-        print(f"\nProfile found! Using file: {filename}")
-        input("Press Enter to continue...")
-        return name
-    else:
-        print("\nNo profile found.")
-        print(f"I looked for: {filename}")
-        input("Press Enter to continue...")
+def data_dir() -> Path:
+    configured = os.environ.get(DATA_DIR_ENV)
+    return Path(configured).expanduser() if configured else DEFAULT_DATA_DIR
+
+
+def slugify(value: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", value.strip().lower()).strip("_")
+    return slug or "user"
+
+
+def profile_path(slug: str) -> Path:
+    return data_dir() / f"{slug}_profile.json"
+
+
+def history_path(slug: str) -> Path:
+    return data_dir() / f"{slug}_mood_history.csv"
+
+
+def ensure_data_dir() -> None:
+    data_dir().mkdir(parents=True, exist_ok=True)
+
+
+def print_header(title: str = APP_NAME) -> None:
+    line = "=" * len(title)
+    print(f"\n{title}\n{line}")
+
+
+def ask_required(prompt: str) -> str:
+    while True:
+        value = input(prompt).strip()
+        if value:
+            return value
+        print("Please enter a value.")
+
+
+def ask_rating(prompt: str) -> int:
+    while True:
+        answer = input(f"{prompt} (1-10): ").strip()
+        try:
+            rating = int(answer)
+        except ValueError:
+            print("Please enter a whole number from 1 to 10.")
+            continue
+
+        if 1 <= rating <= 10:
+            return rating
+        print("Please enter a number from 1 to 10.")
+
+
+def create_profile() -> Profile:
+    print_header("Create Profile")
+    name = ask_required("Name: ")
+    age = input("Age (optional): ").strip()
+    reason = input("Why are you tracking your mood? (optional): ").strip()
+    slug = slugify(name)
+    profile = Profile(name=name, slug=slug, age=age, reason=reason)
+
+    ensure_data_dir()
+    profile_path(slug).write_text(json.dumps(profile.__dict__, indent=2), encoding="utf-8")
+    initialize_history_file(slug)
+
+    print(f"\nProfile saved for {profile.name}.")
+    print(f"Data folder: {data_dir()}")
+    return profile
+
+
+def load_profile() -> Profile | None:
+    print_header("Load Profile")
+    name = ask_required("Name: ")
+    slug = slugify(name)
+    path = profile_path(slug)
+
+    if not path.exists():
+        print(f"\nNo profile found for {name}.")
+        print(f"Expected file: {path}")
         return None
 
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        print("That profile file exists, but it is not valid JSON.")
+        return None
 
-def choose_user():
-    """Menu: create new, load existing, or quit."""
+    return Profile(
+        name=payload.get("name", name),
+        slug=payload.get("slug", slug),
+        age=payload.get("age", ""),
+        reason=payload.get("reason", ""),
+    )
+
+
+def choose_profile() -> Profile | None:
     while True:
-        print(" Mood Predictor ")
-        print("1. Create new user profile")
-        print("2. Load existing user profile")
+        print_header()
+        print("1. Create profile")
+        print("2. Load profile")
         print("3. Quit")
-
-        choice = input("Choose (1-3): ").strip()
+        choice = input("Choose an option: ").strip()
 
         if choice == "1":
-            return create_new_user()
-        elif choice == "2":
-            name = load_existing_user()
-            if name is not None:
-                return name
+            return create_profile()
+        if choice == "2":
+            profile = load_profile()
+            if profile:
+                return profile
+            pause()
         elif choice == "3":
-            print("Goodbye!")
-            exit(0)
+            return None
         else:
             print("Invalid option.")
-            input("Press Enter to try again...")
+            pause()
 
 
-#  QUESTION LOGIC
+def initialize_history_file(slug: str) -> None:
+    path = history_path(slug)
+    if path.exists():
+        return
 
-def ask_rating(prompt):
-    """Ask for a number from 1 to 10 and validate it."""
-    while True:
-        answer = input(prompt)
-        try:
-            value = int(answer)
-            if 1 <= value <= 10:
-                return value
-            else:
-                print("Please enter a number from 1 to 10.")
-        except ValueError:
-            print("Please enter a number from 1 to 10.")
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
+        writer.writeheader()
 
 
-def ask_five_questions():
-    "Ask 5 mood questions and return answers as a dictionary."
-    print("\n Daily Mood Questionnaire ")
-    print("Rate each from 1 to 10.\n")
-
-    energy = ask_rating("1) How much ENERGY do you have? (1-10): ")
-    
-    valence = ask_rating("2) How POSITIVE do you feel? (1-10): ")
-    
-    stress = ask_rating("3) How STRESSED are you? (1-10): ")
-    
-    connection = ask_rating("4) How CONNECTED do you feel? (1-10): ")
-    
-    control = ask_rating("5) How much CONTROL do you feel you have? (1-10): ")
-
-    answers = {
-        "energy": energy,
-        "valence": valence,
-        "stress": stress,
-        "connection": connection,
-        "control": control,
-    }
-    return answers
+def ask_mood_questions() -> dict[str, int]:
+    print_header("Daily Check-In")
+    print("Rate each prompt from 1 to 10.\n")
+    return {key: ask_rating(prompt) for key, prompt in QUESTIONS}
 
 
-#  MOOD PREDICTION - this could vary  
-
-def predict_mood_from_answers(answers):
-    "Return happy / sad / stressed / angry / calm / neutral."
+def predict_mood(answers: dict[str, int]) -> MoodResult:
     energy = answers["energy"]
-    valence = answers["valence"]
+    positivity = answers["positivity"]
     stress = answers["stress"]
+    connection = answers["connection"]
     control = answers["control"]
 
-    if valence >= 7 and stress <= 4 and energy >= 5:
-        mood = "happy"
-        
-    elif stress >= 7 and control <= 4:
-        mood = "stressed"
-        
-    elif valence <= 3 and energy <= 4:
-        mood = "sad"
-        
-    elif stress >= 6 and valence <= 4:
-        mood = "angry"
-        
-    elif stress <= 3 and control >= 7:
-        mood = "calm"
-    else:
-        mood = "neutral"
-
-    return mood
+    if stress >= 7 and control <= 4 and positivity <= 5:
+        return MoodResult("Stressed", "High stress and low control are pulling the day down.")
+    if stress >= 7 and positivity <= 4:
+        return MoodResult("Angry", "Stress is high and positivity is low, so frustration may be building.")
+    if positivity <= 3 and energy <= 4 and connection <= 5:
+        return MoodResult("Sad", "Low energy, positivity, and connection point toward a heavier day.")
+    if positivity >= 7 and stress <= 4 and energy >= 5:
+        return MoodResult("Happy", "Positive mood, manageable stress, and enough energy are lining up well.")
+    if stress <= 3 and control >= 7:
+        return MoodResult("Calm", "Low stress and strong control suggest a steady mood.")
+    return MoodResult("Neutral", "Your answers are balanced without one strong mood signal.")
 
 
-def mood_advice(mood):
-    """Return simple advice based on mood."""
+def mood_advice(mood: str) -> str:
     advice = {
-        "happy": "You're feeling good today—enjoy it!",
-        "sad": "It's okay to feel sad. Take it easy today.",
-        "stressed": "Try relaxing, taking a break, or deep breaths.",
-        "angry": "Step away and cool down before reacting.",
-        "calm": "Great! Use this peaceful moment well.",
-        "neutral": "Your mood is steady. Do one small nice thing for yourself.",
+        "Happy": "Use the momentum for something that matters to you.",
+        "Calm": "Protect the calm and keep your day simple.",
+        "Neutral": "Pick one small task or habit to give the day direction.",
+        "Sad": "Be gentle with yourself and reach for one supportive action.",
+        "Angry": "Pause before reacting and give yourself space to cool down.",
+        "Stressed": "Lower the pressure: breathe, list priorities, and handle one thing at a time.",
     }
-    return advice.get(mood, "")
+    return advice.get(mood, "Take a moment to check in with yourself.")
 
 
-#  SAVE MOOD ENTRY 
+def save_entry(profile: Profile, answers: dict[str, int], result: MoodResult, note: str) -> Path:
+    ensure_data_dir()
+    initialize_history_file(profile.slug)
+    path = history_path(profile.slug)
 
-def save_mood_entry(user_name, answers, mood, note):
-    """
-    Write one line of mood history into the user's file
-    and open the file so the user can see their summary.
-    """
-    filename = user_file_name(user_name)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    row = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "mood": result.mood,
+        "note": note.strip(),
+        **answers,
+    }
 
-    os.makedirs(DOWNLOADS, exist_ok=True)
+    with path.open("a", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
+        writer.writerow(row)
 
-    with open(filename, "a") as f:
-        f.write(
-            f"{timestamp} | "
-            f"energy={answers['energy']}, "
-            f"valence={answers['valence']}, "
-            f"stress={answers['stress']}, "
-            f"connection={answers['connection']}, "
-            f"control={answers['control']} | "
-            f"mood={mood.upper()} | "
-            f"note={note}\n"
-        )
+    return path
 
-    # Try to open the file automatically (works on Windows)
+
+def read_history(profile: Profile) -> list[dict[str, str]]:
+    path = history_path(profile.slug)
+    if not path.exists():
+        return []
+
+    with path.open("r", newline="", encoding="utf-8") as file:
+        return list(csv.DictReader(file))
+
+
+def show_history(profile: Profile) -> None:
+    print_header("Mood History")
+    rows = read_history(profile)
+    if not rows:
+        print("No entries yet.")
+        return
+
+    for row in rows[-10:]:
+        note = f" - {row['note']}" if row.get("note") else ""
+        print(f"{row['timestamp']} | {row['mood']}{note}")
+
+    if len(rows) > 10:
+        print(f"\nShowing the latest 10 of {len(rows)} entries.")
+
+
+def show_summary(profile: Profile) -> None:
+    print_header("Mood Summary")
+    rows = read_history(profile)
+    if not rows:
+        print("No entries yet.")
+        return
+
+    mood_counts: dict[str, int] = {}
+    totals = {key: 0 for key, _ in QUESTIONS}
+
+    for row in rows:
+        mood_counts[row["mood"]] = mood_counts.get(row["mood"], 0) + 1
+        for key in totals:
+            totals[key] += int(row[key])
+
+    print(f"Entries: {len(rows)}")
+    print("\nMood counts:")
+    for mood, count in sorted(mood_counts.items(), key=lambda item: item[1], reverse=True):
+        print(f"- {mood}: {count}")
+
+    print("\nAverage scores:")
+    for key, total in totals.items():
+        print(f"- {key.title()}: {total / len(rows):.1f}/10")
+
+
+def open_history_file(profile: Profile) -> None:
+    path = history_path(profile.slug)
+    if not path.exists():
+        print("No history file exists yet.")
+        return
+
     try:
-        if os.name == "nt":
-            os.startfile(filename)
+        if sys.platform.startswith("win"):
+            os.startfile(path)  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.run(["open", str(path)], check=False)
         else:
-            # On Mac/Linux, you could use 'open' or 'xdg-open' if you want.
-            pass
-    except Exception as e:
-        print("Could not open file automatically:", e)
+            subprocess.run(["xdg-open", str(path)], check=False)
+        print(f"Opened: {path}")
+    except OSError as exc:
+        print(f"Could not open the file automatically: {exc}")
+        print(f"History file: {path}")
 
 
-#  MAIN MENU 
+def record_mood(profile: Profile) -> None:
+    answers = ask_mood_questions()
+    note = input("\nOptional note about your day: ")
+    result = predict_mood(answers)
+    path = save_entry(profile, answers, result, note)
 
-def main_menu(user_name):
-    """Main loop after selecting a user."""
+    print_header("Result")
+    print(f"Mood: {result.mood}")
+    print(result.message)
+    print(f"Advice: {mood_advice(result.mood)}")
+    print(f"\nSaved to: {path}")
+
+
+def profile_menu(profile: Profile) -> bool:
+    print_header(f"{APP_NAME} - {profile.name}")
+    print("1. Record today's mood")
+    print("2. View recent history")
+    print("3. View summary")
+    print("4. Open history file")
+    print("5. Switch profile")
+    print("6. Quit")
+    choice = input("Choose an option: ").strip()
+
+    if choice == "1":
+        record_mood(profile)
+    elif choice == "2":
+        show_history(profile)
+    elif choice == "3":
+        show_summary(profile)
+    elif choice == "4":
+        open_history_file(profile)
+    elif choice == "5":
+        return False
+    elif choice == "6":
+        raise SystemExit(0)
+    else:
+        print("Invalid option.")
+
+    pause()
+    return True
+
+
+def pause() -> None:
+    input("\nPress Enter to continue...")
+
+
+def main() -> None:
     while True:
-        print(f"\n Mood Predictor (User: {user_name}) ")
-        print("1. Answer today's mood questions")
-        print("2. Switch user")
-        print("3. Exit")
+        profile = choose_profile()
+        if profile is None:
+            print("Goodbye.")
+            return
 
-        choice = input("Choose (1-3): ").strip()
-
-        if choice == "1":
-            answers = ask_five_questions()
-            note = input("\nOptional note about your day: ")
-
-            mood = predict_mood_from_answers(answers)
-
-            print(f"\nYour mood is: {mood.upper()}")
-            print("Advice:", mood_advice(mood))
-
-            save_mood_entry(user_name, answers, mood, note)
-
-            print("\nSaved to your file in your Downloads folder.")
-            print("The file should now be open so you can review it.")
-            input("Press Enter to continue...")
-
-        elif choice == "2":
-            user_name = choose_user()
-
-        elif choice == "3":
-            print("Goodbye!")
-            break
-
-        else:
-            print("Invalid option.")
-            input("Press Enter to try again...")
-
-
-#  ENTRY POINT 
-
-def main():
-    user = choose_user()
-    main_menu(user)
+        keep_current_profile = True
+        while keep_current_profile:
+            keep_current_profile = profile_menu(profile)
 
 
 if __name__ == "__main__":
     main()
-
