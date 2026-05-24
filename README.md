@@ -1,145 +1,77 @@
 # Mood Predictor
 
-A simple Python-based Mood Predictor that analyzes user input and predicts emotional state based on self-reported scores. This project was developed to practice core Python programming concepts while building a small, practical application that demonstrates data input, decision-making logic, and file handling.
+A polished Python command-line app for recording daily mood check-ins, predicting a mood category from self-reported scores, and saving a local mood history for later review.
 
----
-Project presentation files can be viewed below:
+The app uses a transparent rule-based model instead of a black-box prediction system. Users rate five factors from 1 to 10, and the program uses those answers to classify the day as `Happy`, `Calm`, `Neutral`, `Sad`, `Angry`, or `Stressed`.
 
-<a href="Mood predictor presentation .pdf">View Presentation (PDF)</a>
+## Features
 
+- Create and load local user profiles
+- Record daily ratings for energy, positivity, stress, connection, and control
+- Predict a mood using clear rule-based logic
+- Save mood history to CSV
+- View recent entries from the terminal
+- Generate a simple mood summary with counts and averages
+- Open the saved history file from the app
+- Includes automated tests and GitHub Actions CI
 
+## Project Structure
 
+```text
+.
+├── main.py                              # Mood Predictor CLI app
+├── tests/
+│   └── test_main.py                     # Unit tests for core behavior
+├── docs/
+│   ├── mood-predictor-presentation.pdf
+│   └── mood-predictor-presentation.pptx
+└── .github/workflows/ci.yml             # Syntax and test checks
+```
 
+## How It Works
 
-## Overview
+The app asks for five ratings:
 
-The Mood Predictor is an interactive console application where users answer five short questions related to their emotional state. Based on the responses, the program predicts a mood category such as happy, stressed, calm, sad, angry, or neutral.
+| Factor | Meaning |
+| --- | --- |
+| Energy | How physically or mentally energized the user feels |
+| Positivity | How positive the user feels overall |
+| Stress | How much pressure the user feels |
+| Connection | How connected the user feels to others |
+| Control | How much control the user feels over the day |
 
-The system also saves results to a text file, allowing users to keep a history of their mood entries over time.
+Those scores are passed into a rule-based mood classifier. For example:
 
-This project focuses on applying programming fundamentals to a real-world inspired problem while maintaining simplicity and usability.
+- High positivity, low stress, and enough energy -> `Happy`
+- Low stress and high control -> `Calm`
+- High stress and low control -> `Stressed`
+- Low positivity and low energy -> `Sad`
 
----
+## Run Locally
 
-## Core Functionality
+```bash
+python main.py
+```
 
-- User creates or loads a profile.
-- User answers five mood-related questions on a scale of 1–10.
-- The system predicts a mood using rule-based logic.
-- Results are saved automatically to a text file.
-- Mood history is stored in the user's Downloads folder.
-- Generated file opens automatically after saving.
+The app stores local data in:
 
----
+```text
+~/Documents/MoodPredictor
+```
 
-## The Five Mood Inputs
+To choose a different storage location, set the `MOOD_PREDICTOR_DIR` environment variable before running the app.
 
-Users provide scores from **1 to 10** for:
+## Run Tests
 
-- Energy
-- Positivity
-- Stress
-- Connection
-- Control
+```bash
+python -m unittest discover -s tests
+```
 
-These inputs are used to determine the predicted mood.
+## Notes
 
----
-
-## Mood Prediction Logic
-
-The program uses conditional logic to determine mood:
-
-- High positivity + low stress → **Happy**
-- High stress + low control → **Stressed**
-- Low energy + low positivity → **Sad**
-- High stress + low positivity → **Angry**
-- Low stress + high control → **Calm**
-- Otherwise → **Neutral**
-
-This rule-based approach allows the system to make simple but meaningful predictions.
-
----
-
-## Program Flow
-Start Program
-↓
-Create / Load User Profile
-↓
-Answer 5 Questions
-↓
-Predict Mood
-↓
-Save Results to File
-↓
-Display Output / Exit
-
-
----
-
-## Technologies Used
-
-- **Language:** Python
-- **Concepts Applied:**
-  - Input and Output (`input()`, `print()`)
-  - Control flow (`if`, `elif`, `else`)
-  - Loops (`while`)
-  - Functions and modular programming
-  - Dictionaries and data structures
-  - File handling (File I/O)
-
----
-
-## File Storage System
-
-Each user has a dedicated text file:
-
-<username>_mood.txt
-
-
-Example entry:
-
-
-
-2025-12-10 14:30
-Scores: [8, 7, 2, 9, 8]
-Mood: Happy
-Note: Good coding session!
-
-This allows users to track mood history over time.
-
----
-
-## Challenges Solved
-
-- Input validation to ensure only values between 1–10 are accepted.
-- Error handling for missing or invalid user profiles.
-- Safe file creation using username-based filenames.
-- Ensuring consistent data storage format.
-
----
-
-## Future Improvements
-
-- Mood trend visualization using matplotlib.
-- Graphical user interface (GUI) using Tkinter.
-- Weekly or monthly mood summaries.
-- Data privacy improvements through encryption.
-- Exporting mood reports.
-
-
----
-
-## Project Purpose
-
-This project was created to strengthen understanding of Python fundamentals through practical application, demonstrating how simple logic and structured programming can be used to solve real-world inspired problems.
-
----
+This project is for personal tracking and programming practice. It is not a medical, mental health, or diagnostic tool.
 
 ## Author
 
-**Mike Maeda**  
-Computer Science & Data Analytics Student  
-Alfred University
-
-
+Mike Maeda  
+Computer Science & Data Analytics, Alfred University
