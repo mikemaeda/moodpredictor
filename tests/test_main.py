@@ -49,7 +49,8 @@ class MoodPredictorTests(unittest.TestCase):
             }
         )
         self.assertEqual(result.mood, "Stressed")
-        self.assertEqual(result.level, "Mixed")
+        self.assertEqual(result.score, 36)
+        self.assertEqual(result.level, "Low")
 
     def test_trend_label_detects_improvement(self):
         rows = [
