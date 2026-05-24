@@ -20,7 +20,18 @@ QUESTIONS = [
     ("connection", "How connected do you feel to people around you?"),
     ("control", "How much control do you feel you have today?"),
 ]
-FIELDNAMES = ["timestamp", "energy", "positivity", "stress", "connection", "control", "mood", "note"]
+QUESTION_KEYS = [key for key, _ in QUESTIONS]
+FIELDNAMES = [
+    "timestamp",
+    "energy",
+    "positivity",
+    "stress",
+    "connection",
+    "control",
+    "mood_score",
+    "mood",
+    "note",
+]
 
 
 @dataclass(frozen=True)
@@ -35,6 +46,8 @@ class Profile:
 class MoodResult:
     mood: str
     message: str
+    score: int
+    level: str
 
 
 def data_dir() -> Path:
@@ -166,24 +179,43 @@ def ask_mood_questions() -> dict[str, int]:
     return {key: ask_rating(prompt) for key, prompt in QUESTIONS}
 
 
+def calculate_mood_score(answers: dict[str, int]) -> int:
+    positive_total = answers["energy"] + answers["positivity"] + answers["connection"] + answers["control"]
+    stress_adjusted = 11 - answers["stress"]
+    raw_score = (positive_total + stress_adjusted) / 50 * 100
+    return max(0, min(100, round(raw_score)))
+
+
+def wellness_level(score: int) -> str:
+    if score >= 80:
+        return "Strong"
+    if score >= 60:
+        return "Stable"
+    if score >= 40:
+        return "Mixed"
+    return "Low"
+
+
 def predict_mood(answers: dict[str, int]) -> MoodResult:
     energy = answers["energy"]
     positivity = answers["positivity"]
     stress = answers["stress"]
     connection = answers["connection"]
     control = answers["control"]
+    score = calculate_mood_score(answers)
+    level = wellness_level(score)
 
     if stress >= 7 and control <= 4 and positivity <= 5:
-        return MoodResult("Stressed", "High stress and low control are pulling the day down.")
+        return MoodResult("Stressed", "High stress and low control are pulling the day down.", score, level)
     if stress >= 7 and positivity <= 4:
-        return MoodResult("Angry", "Stress is high and positivity is low, so frustration may be building.")
+        return MoodResult("Angry", "Stress is high and positivity is low, so frustration may be building.", score, level)
     if positivity <= 3 and energy <= 4 and connection <= 5:
-        return MoodResult("Sad", "Low energy, positivity, and connection point toward a heavier day.")
+        return MoodResult("Sad", "Low energy, positivity, and connection point toward a heavier day.", score, level)
     if positivity >= 7 and stress <= 4 and energy >= 5:
-        return MoodResult("Happy", "Positive mood, manageable stress, and enough energy are lining up well.")
+        return MoodResult("Happy", "Positive mood, manageable stress, and enough energy are lining up well.", score, level)
     if stress <= 3 and control >= 7:
-        return MoodResult("Calm", "Low stress and strong control suggest a steady mood.")
-    return MoodResult("Neutral", "Your answers are balanced without one strong mood signal.")
+        return MoodResult("Calm", "Low stress and strong control suggest a steady mood.", score, level)
+    return MoodResult("Neutral", "Your answers are balanced without one strong mood signal.", score, level)
 
 
 def mood_advice(mood: str) -> str:
@@ -206,6 +238,7 @@ def save_entry(profile: Profile, answers: dict[str, int], result: MoodResult, no
     row = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "mood": result.mood,
+        "mood_score": result.score,
         "note": note.strip(),
         **answers,
     }
@@ -223,7 +256,66 @@ def read_history(profile: Profile) -> list[dict[str, str]]:
         return []
 
     with path.open("r", newline="", encoding="utf-8") as file:
-        return list(csv.DictReader(file))
+        rows = list(csv.DictReader(file))
+
+    for row in rows:
+        if not row.get("mood_score"):
+            row["mood_score"] = str(calculate_mood_score(row_to_answers(row)))
+    return rows
+
+
+def row_to_answers(row: dict[str, str]) -> dict[str, int]:
+    return {key: safe_int(row.get(key, "0")) for key in QUESTION_KEYS}
+
+
+def safe_int(value: str | int | None, default: int = 0) -> int:
+    try:
+        return int(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def score_bar(score: int, width: int = 18) -> str:
+    filled = round((score / 100) * width)
+    return "[" + "#" * filled + "." * (width - filled) + f"] {score:3d}/100"
+
+
+def average_score(rows: list[dict[str, str]]) -> float:
+    if not rows:
+        return 0.0
+    return sum(safe_int(row.get("mood_score")) for row in rows) / len(rows)
+
+
+def trend_label(rows: list[dict[str, str]]) -> str:
+    if len(rows) < 6:
+        return "Add a few more entries to unlock trend detection."
+
+    recent = average_score(rows[-3:])
+    previous = average_score(rows[-6:-3])
+    difference = recent - previous
+
+    if difference >= 5:
+        return f"Improving by {difference:.1f} points over the last 3 entries."
+    if difference <= -5:
+        return f"Dropping by {abs(difference):.1f} points over the last 3 entries."
+    return "Stable over the last 3 entries."
+
+
+def focus_area(rows: list[dict[str, str]]) -> str:
+    if not rows:
+        return "No focus area yet."
+
+    averages = {
+        key: sum(safe_int(row.get(key)) for row in rows) / len(rows)
+        for key in QUESTION_KEYS
+    }
+
+    if averages["stress"] >= 7:
+        return "Stress is the clearest pressure point."
+
+    positive_keys = ["energy", "positivity", "connection", "control"]
+    lowest = min(positive_keys, key=lambda key: averages[key])
+    return f"{lowest.title()} has the most room to improve."
 
 
 def show_history(profile: Profile) -> None:
@@ -234,8 +326,9 @@ def show_history(profile: Profile) -> None:
         return
 
     for row in rows[-10:]:
+        score = safe_int(row.get("mood_score"))
         note = f" - {row['note']}" if row.get("note") else ""
-        print(f"{row['timestamp']} | {row['mood']}{note}")
+        print(f"{row['timestamp']} | {row['mood']:<8} | {score_bar(score, 10)}{note}")
 
     if len(rows) > 10:
         print(f"\nShowing the latest 10 of {len(rows)} entries.")
@@ -249,21 +342,42 @@ def show_summary(profile: Profile) -> None:
         return
 
     mood_counts: dict[str, int] = {}
-    totals = {key: 0 for key, _ in QUESTIONS}
+    totals = {key: 0 for key in QUESTION_KEYS}
 
     for row in rows:
         mood_counts[row["mood"]] = mood_counts.get(row["mood"], 0) + 1
         for key in totals:
-            totals[key] += int(row[key])
+            totals[key] += safe_int(row.get(key))
 
+    avg_score = average_score(rows)
     print(f"Entries: {len(rows)}")
+    print(f"Average mood score: {avg_score:.1f}/100 ({wellness_level(round(avg_score))})")
+    print(f"Trend: {trend_label(rows)}")
+    print(f"Focus: {focus_area(rows)}")
+
     print("\nMood counts:")
     for mood, count in sorted(mood_counts.items(), key=lambda item: item[1], reverse=True):
         print(f"- {mood}: {count}")
 
-    print("\nAverage scores:")
+    print("\nAverage ratings:")
     for key, total in totals.items():
         print(f"- {key.title()}: {total / len(rows):.1f}/10")
+
+
+def show_trend_chart(profile: Profile) -> None:
+    print_header("Mood Score Trend")
+    rows = read_history(profile)
+    if not rows:
+        print("No entries yet.")
+        return
+
+    for row in rows[-14:]:
+        timestamp = row.get("timestamp", "")[:10]
+        score = safe_int(row.get("mood_score"))
+        mood = row.get("mood", "Unknown")
+        print(f"{timestamp} {mood:<8} {score_bar(score)}")
+
+    print(f"\n{trend_label(rows)}")
 
 
 def open_history_file(profile: Profile) -> None:
@@ -293,6 +407,7 @@ def record_mood(profile: Profile) -> None:
 
     print_header("Result")
     print(f"Mood: {result.mood}")
+    print(f"Score: {score_bar(result.score)} ({result.level})")
     print(result.message)
     print(f"Advice: {mood_advice(result.mood)}")
     print(f"\nSaved to: {path}")
@@ -303,9 +418,10 @@ def profile_menu(profile: Profile) -> bool:
     print("1. Record today's mood")
     print("2. View recent history")
     print("3. View summary")
-    print("4. Open history file")
-    print("5. Switch profile")
-    print("6. Quit")
+    print("4. View mood score trend")
+    print("5. Open history file")
+    print("6. Switch profile")
+    print("7. Quit")
     choice = input("Choose an option: ").strip()
 
     if choice == "1":
@@ -315,10 +431,12 @@ def profile_menu(profile: Profile) -> bool:
     elif choice == "3":
         show_summary(profile)
     elif choice == "4":
-        open_history_file(profile)
+        show_trend_chart(profile)
     elif choice == "5":
-        return False
+        open_history_file(profile)
     elif choice == "6":
+        return False
+    elif choice == "7":
         raise SystemExit(0)
     else:
         print("Invalid option.")
