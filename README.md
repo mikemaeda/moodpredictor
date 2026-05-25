@@ -1,36 +1,63 @@
 # Mood Compass
 
-Mood Compass is a privacy-first React + TypeScript web app for quick mood check-ins, local pattern tracking, small evidence-informed recommendations, and transparent personal mood forecasting after enough history exists.
+**Live app:** https://moodpredictor.vercel.app
 
-It is portfolio-ready, deployable on Vercel, and intentionally non-diagnostic.
+**Repository:** https://github.com/mikemaeda/moodpredictor
 
-## Product Decisions
+Mood Compass is a privacy-first mood tracking web app built with React, TypeScript, and Vite. It helps users complete quick mood check-ins, track local patterns over time, receive small evidence-informed recommendations, and view gentle personal forecasts once enough history exists.
 
-- **Fast first:** the basic check-in can be completed in seconds with a tap on the pleasantness x energy mood map.
-- **Progressive depth:** emotion, intensity, physical sensations, context tags, notes, and voice-note placeholders are optional.
-- **No fake AI:** forecasts use explainable rolling averages, recent patterns, time-of-day signals, and context tags.
-- **Privacy-first:** mood data is stored locally in the browser for the MVP. Export and delete are available in settings.
-- **Safety-aware:** crisis-oriented note text triggers a calm support panel with emergency/help resources.
-- **Accessible:** the app uses semantic pages, visible focus states, keyboard-operable controls, reduced-motion support, and high-contrast UI.
+Mood Compass is intentionally **non-diagnostic**. It is a wellness and self-reflection tool, not a medical device or replacement for professional care.
 
-## Route Map
+## Highlights
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Landing page |
-| `/onboarding` | First-time education |
-| `/app` | Dashboard |
-| `/app/check-in` | Mood check-in flow |
-| `/app/history` | Timeline and mood pixels |
-| `/app/insights` | Patterns, weekly review, gentle forecast |
-| `/app/tools` | Recommendation library |
-| `/app/settings` | Export, delete, analytics, reduced motion |
-| `/privacy` | Plain-English privacy page |
-| `/forecasting` | How forecasting works |
-| `/help-now` | Support resources placeholder |
-| `/preview` | Storybook-like component preview route |
+- Quick mood check-ins with simple state selection
+- Optional deeper details: emotions, intensity, sensations, context tags, and notes
+- Local-first storage using the browser
+- Export and delete controls for user data
+- Dashboard with today summary, gentle streaks, weekly review, and mood pixels
+- History, insights, tools, settings, privacy, forecasting, and help-now pages
+- Evidence-informed recommendation tools
+- Transparent forecasting logic with confidence labels
+- Accessibility-minded UI with keyboard support, focus states, and reduced-motion support
+- Deployed on Vercel
 
-## Architecture
+## Privacy-First Design
+
+Mood Compass stores each user's data locally in their browser for the MVP. No account is required, and mood history is not sent to a server.
+
+Users can:
+
+- Save mood entries locally
+- Export their data as JSON
+- Delete all local data
+- Disable analytics
+- Enable reduced motion
+
+Because storage is local-first, data does not automatically sync across devices or browsers.
+
+## How It Works
+
+1. Choose the closest current mood state.
+2. Optionally add a primary emotion, tags, sensations, or note.
+3. Save the check-in locally.
+4. Review trends, patterns, and recommendations over time.
+5. After enough history exists, Mood Compass shows a gentle forecast based on personal patterns.
+
+Forecasts are explainable and never presented as certain.
+
+## Tech Stack
+
+- React
+- TypeScript
+- Vite
+- CSS
+- Local Storage
+- Vitest
+- Testing Library
+- Playwright
+- Vercel
+
+## Project Structure
 
 ```text
 src/
@@ -50,37 +77,17 @@ src/
 
 Core logic lives in `src/lib`:
 
-- `mood.ts`: quadrant, scoring, dates, summaries
+- `mood.ts`: mood state, scoring, dates, summaries
 - `recommendations.ts`: mood-state tool matching
-- `forecast.ts`: transparent personal forecast and patterns
+- `forecast.ts`: transparent personal forecasting and pattern detection
 - `safety.ts`: crisis-language detection
 - `storage.ts`: local-first persistence
 - `export.ts`: JSON export
 
-## Data Model
-
-Mood entries include:
-
-- pleasantness and energy
-- quadrant
-- primary and optional secondary emotion
-- optional custom emotion
-- optional intensity
-- optional sensations and context tags
-- optional note and voice-note placeholder
-- recommendation id
-
-## Local Development
-
-Install dependencies:
+## Run Locally
 
 ```bash
 npm install
-```
-
-Run the app:
-
-```bash
 npm run dev
 ```
 
@@ -90,47 +97,26 @@ Build:
 npm run build
 ```
 
-Run unit and component tests:
+Tests:
 
 ```bash
 npm test
-```
-
-Run e2e tests:
-
-```bash
 npm run test:e2e
 ```
 
-## Deploy On Vercel
-
-1. Push this repository to GitHub.
-2. Import it in Vercel.
-3. Use the default Vite settings.
-4. Deploy.
-
-`vercel.json` includes an SPA rewrite to `index.html`.
-
-## Evidence-Informed Basis
-
-Mood Compass uses:
-
-- Pleasantness/energy mood mapping inspired by valence-arousal emotion models:
-  https://pmc.ncbi.nlm.nih.gov/articles/PMC2367156/
-- Affect self-report concepts related to positive and negative affect:
-  https://pubmed.ncbi.nlm.nih.gov/3397865/
-- Practical self-care behaviors such as movement, sleep, hydration, connection, and breathing:
-  https://www.nimh.nih.gov/health/topics/caring-for-your-mental-health
-
-Mood Compass is not a medical device, diagnostic tool, or replacement for licensed professional care.
-
-## Legacy Python CLI
-
-The original CLI prototype remains in `main.py` with tests in `tests/test_main.py`.
+Legacy Python CLI tests:
 
 ```bash
 python -m unittest discover -s tests -p "test_main.py"
 ```
+
+## Evidence-Informed Basis
+
+Mood Compass is inspired by:
+
+- Valence-arousal emotion models: https://pmc.ncbi.nlm.nih.gov/articles/PMC2367156/
+- Positive and negative affect self-report concepts: https://pubmed.ncbi.nlm.nih.gov/3397865/
+- Practical self-care guidance from NIMH: https://www.nimh.nih.gov/health/topics/caring-for-your-mental-health
 
 ## Author
 
