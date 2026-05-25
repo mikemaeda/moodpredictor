@@ -4,6 +4,13 @@ __pycache__/
 .venv/
 venv/
 
+# Node / React
+node_modules/
+dist/
+test-results/
+playwright-report/
+*.tsbuildinfo
+
 # Local app data
 MoodPredictor/
 *_mood_history.csv
